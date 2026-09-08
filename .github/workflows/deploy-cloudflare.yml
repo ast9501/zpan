@@ -240,6 +240,28 @@ jobs:
           ZPAN_APP_COMMIT: ${{ github.sha }}
         run: pnpm build
 
+      - name: Verify generated Wrangler database ID
+        env:
+          DB_ID: ${{ steps.d1.outputs.id }}
+        run: |
+          GENERATED_CONFIG="dist/zpan/wrangler.json"
+          if [ ! -f "$GENERATED_CONFIG" ]; then
+            echo "::error::Generated Wrangler config not found: $GENERATED_CONFIG"
+            exit 1
+          fi
+          GENERATED_DB_ID=$(jq -r '.d1_databases[] | select(.binding == "DB") | .database_id' "$GENERATED_CONFIG")
+          if [ "$GENERATED_DB_ID" != "$DB_ID" ]; then
+            echo "Patching generated Wrangler config database ID"
+            TMP_CONFIG=$(mktemp)
+            jq --arg db "$DB_ID" \
+              '(.d1_databases[] | select(.binding == "DB") | .database_id) = $db' \
+              "$GENERATED_CONFIG" > "$TMP_CONFIG"
+            mv "$TMP_CONFIG" "$GENERATED_CONFIG"
+          fi
+          jq -e --arg db "$DB_ID" \
+            '.d1_databases[] | select(.binding == "DB" and .database_id == $db)' \
+            "$GENERATED_CONFIG" > /dev/null
+
       - name: Deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
