@@ -100,14 +100,21 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          KV_ID=$(pnpm exec wrangler kv namespace list --json \
-            | jq -r '.[] | select(.title == "CACHE_KV") | .id' \
+          KV_ENDPOINT="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
+          KV_LIST=$(curl --fail-with-body -sS "$KV_ENDPOINT" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json")
+          KV_ID=$(printf '%s\n' "$KV_LIST" \
+            | jq -r '.result[] | select(.title == "CACHE_KV") | .id' \
             | head -n 1)
 
           if [ -z "$KV_ID" ]; then
-            OUTPUT=$(pnpm exec wrangler kv namespace create CACHE_KV 2>&1)
-            printf '%s\n' "$OUTPUT"
-            KV_ID=$(printf '%s\n' "$OUTPUT" | sed -n 's/.*id = "\([^"]*\)".*/\1/p' | head -n 1)
+            CREATE_RESPONSE=$(curl --fail-with-body -sS -X POST "$KV_ENDPOINT" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data '{"title":"CACHE_KV"}')
+            KV_ID=$(printf '%s\n' "$CREATE_RESPONSE" | jq -r '.result.id // empty')
+            # The API response above already contains the namespace ID. -n 's/.*id = "\([^"]*\)".*/\1/p' | head -n 1)
             echo "Created KV namespace: $KV_ID"
           else
             echo "Reusing KV namespace: $KV_ID"
