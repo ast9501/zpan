@@ -208,8 +208,32 @@ jobs:
           DB_ID: ${{ steps.d1.outputs.id }}
           KV_ID: ${{ steps.kv.outputs.id }}
         run: |
-          sed -i "0,/database_id = \"[^\"]*\"/s//database_id = \"$DB_ID\"/" wrangler.toml
-          sed -i "0,/id = \"[^\"]*\"/s//id = \"$KV_ID\"/" wrangler.toml
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path("wrangler.toml")
+          text = path.read_text()
+          old_db = text
+          text = text.replace(
+              'database_id = "5bd64957-fa49-4da0-8b7b-6e0ad84037e7"',
+              f'database_id = "{os.environ["DB_ID"]}"',
+              1,
+          )
+          if text == old_db:
+              raise SystemExit("production D1 database_id was not found in wrangler.toml")
+          old_kv = text
+          text = text.replace(
+              'id = "2721f9d7b47d433d8a0e02171e276f57"',
+              f'id = "{os.environ["KV_ID"]}"',
+              1,
+          )
+          if text == old_kv:
+              raise SystemExit("production CACHE_KV namespace ID was not found in wrangler.toml")
+          path.write_text(text)
+          PY
+          grep -A4 -B1 '^database_id' wrangler.toml
+          grep -A2 -B1 '^\[\[kv_namespaces\]\]' wrangler.toml | head -n 4
 
       - name: Set BETTER_AUTH_SECRET (first deploy only)
         env:
