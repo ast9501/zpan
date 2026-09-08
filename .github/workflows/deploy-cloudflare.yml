@@ -92,6 +92,11 @@ jobs:
             echo "::error::Failed to obtain D1 database UUID"
             exit 1
           fi
+          # Wrangler may return the D1 UUID without hyphens; the query endpoint
+          # requires the canonical UUID form.
+          if [[ "$DB_ID" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            DB_ID="${DB_ID:0:8}-${DB_ID:8:4}-${DB_ID:12:4}-${DB_ID:16:4}-${DB_ID:20:12}"
+          fi
           echo "id=$DB_ID" >> "$GITHUB_OUTPUT"
 
       - name: Ensure production KV namespace exists
