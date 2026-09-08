@@ -24,6 +24,7 @@ export interface ScheduledEnv {
 
 const TRAFFIC_SYNC_CRON = '*/10 * * * *'
 const STATS_ROLLUP_CRON = '10 * * * *'
+const LICENSING_CRON = '0 */6 * * *'
 const QUOTA_RESET_CRON = '0 0 1 * *'
 const TRASH_PURGE_CRON = '0 4 * * *'
 type ScheduledTrigger = Pick<ScheduledEvent, 'cron'>
@@ -81,5 +82,7 @@ export async function handleScheduled(event: ScheduledTrigger, env: ScheduledEnv
     return
   }
 
-  await runLicensingRefresh(deps, cloudBaseUrl)
+  if (event.cron === LICENSING_CRON) {
+    await runLicensingRefresh(deps, cloudBaseUrl)
+  }
 }
